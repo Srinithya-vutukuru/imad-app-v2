@@ -1,6 +1,7 @@
 body {
     font-family: sans-serif;
-    background-color: lightgrey;
+    background-color: #aeb0bd;
+    background-image:url("http://www.planwallpaper.com/static/images/518071-background-hd_xO1TwRc.jpg");
     margin-top: 75px;
 }
 
@@ -9,7 +10,8 @@ body {
 }
 
 .text-big {
-    font-size: 300%;
+    font-size: 200%;
+    color: #670a8c;
 }
 
 .bold {
@@ -19,4 +21,23 @@ body {
 .img-medium {
     height: 200px;
 }
-
+.container{
+    max-width: 800px;
+    margin: 0 auto;
+    color: #303F9F;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 60px;
+}
+.left{
+	text-align: left;
+}
+.right{
+	text-align:right;
+}
+.links{
+	display:inline;
+}
+.space{
+	text="  ";
+}
