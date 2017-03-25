@@ -89,7 +89,7 @@ app.get('/hash/:input',function(req, res){
 app.post('/create-user',function(req,res){
 	var username = req.body.username;
 	var password = req.body.password;
-	if(username.length != 0 && password.length > 6){
+	if(username.length !== 0 && password.length > 6){
 		var salt = crypto.randomBytes(120).toString('hex');
 		var dbString = hash(password,salt);
 		pool.getConnection(function(err,connection){
