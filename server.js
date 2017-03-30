@@ -1,7 +1,7 @@
 var express = require('express');
 var morgan = require('morgan');
 var path = require('path');
-var mysql = require('mysql');
+var Pool = require('pg').Pool;
 var crypto = require('crypto');
 var bodyParser = require('body-parser');
 var session = require('express-session');
@@ -16,12 +16,13 @@ app.use(session({
 	saveUninitialized : true
 }));
 
-var pool = mysql.createPool({
-	host : '127.0.0.1',
-	user : 'debian-sys-maint',
-	password : 'nNrPyYJJnJW1cA5p',
-	database  : 'nithya_app'
-});
+var config = {
+  user:'srinithya-vutukuru',
+  database: 'srinithya-vutukuru',
+  host: 'db.imad.hasura-app.io',
+  port: '5432',
+  password: process.env.DB_PASSWORD
+};
 
 
 
@@ -77,6 +78,7 @@ app.get('/', function (req, res) {
   res.sendFile(path.join(__dirname,'ui','index.html'));
 
 });
+var pool = new Pool(config);
 function hash(input,salt){
 	//create hash
 	var hashed = crypto.pbkdf2Sync(input , salt, 100000, 512, 'sha512');
@@ -85,25 +87,24 @@ function hash(input,salt){
 app.get('/hash/:input',function(req, res){
 	var hashedString = hash(req.params.input,"this-is-some-random-string");
 	res.send(hashedString);
-})
+});
 app.post('/create-user',function(req,res){
 	var username = req.body.username;
 	var password = req.body.password;
 	if(username.length !== 0 && password.length > 6){
 		var salt = crypto.randomBytes(120).toString('hex');
 		var dbString = hash(password,salt);
-		pool.getConnection(function(err,connection){
-		connection.query("SELECT * FROM `user` WHERE `username` = ?",[username],function(error,results,fields){ 
+	
+		pool.query("SELECT * FROM `user` WHERE `username` = ?",[username],function(error,results,fields){ 
 			if(err){res.status(500).send(err.toString());}
 			else{
 				if(results.length === 0){
-			  		connection.query("INSERT INTO `user` (`username`, `password`) VALUES (?,?)",[username,dbString],function(error,results,fields){  	
+			  		pool.query("INSERT INTO `user` (`username`, `password`) VALUES (?,?)",[username,dbString],function(error,results,fields){  	
 				   	if(err){res.status(500).send(err.toString());}
 				  	else{res.send("User success -- " + username);}
 					});
 			  	}else{res.status(403).send('invalid username/password');}
 			}
-		});
 		});
 	}
 	else{res.status(403).send('invalid username/password');}
@@ -116,21 +117,20 @@ app.post('/create-company',function(req,res){
   var email = req.body.email;
   var add = req.body.address;
   console.log(year);
-  pool.getConnection(function(err,connection){
+  
  // connection.query("INSERT INTO `company` (`name`, `r_name`, `email`, `phone_no`, `year`, `address`) VALUES (?,?,?,?,?,?)",[namec,namer,email,phno
  //   ,year,add],function(error,results,fields){   
-  connection.query("INSERT INTO `company` (`name`, `r_name`, `email`, `phone_no`, `year`, `address`) VALUES (?,?,?,?,?,?)",[namec,namer,email,phno,year,add],function(error,results,fields){   
+  pool.query("INSERT INTO `company` (`name`, `r_name`, `email`, `phone_no`, `year`, `address`) VALUES (?,?,?,?,?,?)",[namec,namer,email,phno,year,add],function(error,results,fields){   
   if(err){res.status(500).send(err.toString());}
   else{res.send(namec + " is successfully regestered !");
 console.log(namec + " is successfully regestered !");}
-  });
   });
 });
 app.post('/login',function(req,res){
 	var username = req.body.username;
 	var password = req.body.password;
 	pool.getConnection(function(err,connection){
-	  	connection.query("SELECT * FROM `user` WHERE `username` = ?",[username],function(error,results,fields){  	
+	  	pool.query("SELECT * FROM `user` WHERE `username` = ?",[username],function(error,results,fields){  	
 		   	if(err){res.status(500).send(err.toString());}
 		  	else{
 		  		if(results.length === 0){
@@ -153,12 +153,11 @@ app.post('/login',function(req,res){
 });
 app.get('/check-login',function(req,res){
 	if(req.session && req.session.auth && req.session.auth.userId){
-		pool.getConnection(function(err,connection){
-			connection.query("SELECT * FROM `user` WHERE id =?",[req.session.auth.userId],function(err,results,fields){
+	
+			pool.query("SELECT * FROM `user` WHERE id =?",[req.session.auth.userId],function(err,results,fields){
 				if(err){res.status(500).send(err.toString());}
 				else{res.send(results[0].username);}
 			});
-		});
 	}
 	else{res.status(400).send('You are not logged in');}
 });
@@ -167,51 +166,10 @@ app.get('/logout',function(req,res){
 //	res.send('<html><body>Logged out!<br/><br/><a href="/">Back to home</a></body></html>');
 	res.send('user logged out');
 });
-var counter=0;
-app.get('/counter', function (req, res) {
-	pool.getConnection(function(err, connection) {
-  	connection.query("UPDATE `counters` SET `counter` = counter +1  WHERE `counters`.`id` = 1",function(error,results,fields){  	
-   	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length===0){res.status(404).send("wrong choice");}}
-  	connection.query("SELECT * FROM counters WHERE id = 1 ", function (error, results, fields) {
-  	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length ===0){res.status(404).send("sorry!!");}else{
-   	counter = results[0].counter;
-  	res.send(counter.toString());
-    }}
-  });
-  });
-});
-});
 
-var paras = [];
-var text =[];
-var j=0;
-app.get('/paras', function (req, res) {//URL:/paras?para=bkxbk
-  //get the name from request
-var para= req.query.para;
-pool.getConnection(function(err, connection) {
-		  	connection.query("INSERT INTO `comments` (`title`, `heading`, `date`, `content`) VALUES ('comments', 'Comments', now(), ?)",[para],function(error,results,fields){  	
-		   	if(err){res.status(500).send(err.toString());}
-		  	else{if(results.length===0){res.status(404).send("wrong choice");}}
-		  	
 
-		  	connection.query("SELECT content FROM comments", function (error, results, fields) {
-		  	if(err){res.status(500).send(err.toString());}
-		  	else{if(results.length ===0){res.status(404).send("sorry!!");}else{
-		  		console.log(results[0]);
-		  	while(j<results.length){
-		   	text[j] = results[j];j++;}
-		   	console.log(text.toString());
-		  res.send(results);
-		    }}
-		  });
-		  });
-		});
-  paras.push(para);
-  //json converts objects into strings and vice versa
-  //res.send(JSON.stringify(paras));
-});
+
+
 var names = [];
 app.get('/submit-name', function (req, res) {//URL:/paras?para=bkxbk
   //get the name from request
@@ -221,81 +179,10 @@ app.get('/submit-name', function (req, res) {//URL:/paras?para=bkxbk
   res.send(JSON.stringify(names));
 });
 
-var list = '';
-var name_new =new Object();
-app.get('/submitcomments', function (req, res) {//URL:/subit-name?name=bkxbk
-  //get the name from request
-  var list_new = '';
-  var i=0;
-  pool.getConnection(function(err, connection) {
-  connection.query("SELECT * FROM comments", function (error, results, fields) {
-		  	if(err){res.status(500).send(err.toString());}
-		  	else{if(results.length ===0){res.status(404).send("sorry!!");}else{
-		  	console.log(results);
-		  	while(j<results.length){
-		   	text[j] = results[j];j++;}
-			name_new = results[results.length-1]; 
-			  i=0;
-			  while(i<results.length)
-			  {
-			  list_new +='<li>' +results[i].content + '</li>' + '<hr/>';
-			  i++;
-			  }
-			  name_new.content=list_new;
-			  console.log(name_new);
-			 res.send(createTemplate(name_new));
-		    }}
-     	});
-	});
-});
-app.get('/articles/:articleName', function (req, res) {
-   pool.getConnection(function(err, connection) {
-  connection.query("SELECT * FROM article WHERE title = ? ",[req.params.articleName], function (error, results, fields) {
-  	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length ===0){res.status(404).send("ARTICLE NOT FOUND");}else{
-  	console.log(results[0]);
-   
-    var articleData = results[0];
-    res.send(createTemplate(articleData));	
-    }}
-    
-  });
-});
-});
-var c;
-app.get('/counters', function (req, res) {
-    pool.getConnection(function(err, connection) {
-  //connection.query("INSERT INTO `article`(`title`, `heading`, `date`, `content`) VALUES ('artcile123', 'kslkmssszk', now(), 'zmvkzlmmlzs')",[req.params.articleName], function (error, results, fields) {
-  	connection.query("SELECT * FROM `counters` ", function (error, results, fields) {
-  	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length ===0){res.status(404).send("ARTICLE NOT FOUND");}else{
-  	console.log(results[0].counter);
-   	c = results[0].counter;
-   	c+=1;
-   	console.log("before "+c);
-   	var cc = JSON.stringify(c);
-  	console.log("after"+ c);
-  	var con_t = 'this button is clicked '+ cc +' times';
-  	connection.query("UPDATE `counters` SET `counter` = counter +1 ,`content`= ? WHERE `counters`.`id` = 1",[con_t] ,function(error,results,fields){  	
-   	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length===0){res.status(404).send("wrong choice");}}
-  	connection.query("SELECT * FROM counters WHERE id = 1 ", function (error, results, fields) {
-  	if(err){res.status(500).send(err.toString());}
-  	else{if(results.length ===0){res.status(404).send("ARTICLE NOT FOUND");}else{
-  	console.log(results[0]);
-   
-    var articleData = results[0];
-    res.send(createTemplate(articleData));	
-    }}
-    
-  });
-  });
-    }}
-    
-  });
-  	
-});  
-});
+
+
+
+
 
 app.get('/ui/style.css', function (req, res) {
   res.sendFile(path.join(__dirname, 'ui', 'style.css'));
